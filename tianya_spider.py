@@ -66,31 +66,82 @@ def notice_wechat(title, content):
     req = requests.post(api, data)
 
 
-def get_outer_urls(keyword, page):
-    '''【分页网址url采集】
-     n：爬取页数
-     结果：得到分页网页的list
-     '''
-    urllst = []
-    for i in range(page):
-        ui = f'https://search.bilibili.com/all?keyword={keyword}&page={i + 1}'
-        urllst.append(ui)
-    return urllst
+def get_outer_urls():
+    '''
+    爬取所有子版块信息
+    :param timestamp:时间戳，毫秒
+    :return:
+    '''
+    url = ['http://bbs.tianya.cn/list-free-1.shtml', 'http://bbs.tianya.cn/list-university-1.shtml',
+           'http://bbs.tianya.cn/list-828-1.shtml', 'http://bbs.tianya.cn/list-develop-1.shtml',
+           'http://bbs.tianya.cn/list-stocks-1.shtml', 'http://bbs.tianya.cn/list-1151-1.shtml',
+           'http://bbs.tianya.cn/list-1179-1.shtml', 'http://bbs.tianya.cn/list-1190-1.shtml',
+           'http://bbs.tianya.cn/list-665-1.shtml', 'http://bbs.tianya.cn/list-feeling-1.shtml',
+           'http://bbs.tianya.cn/list-no11-1.shtml', 'http://bbs.tianya.cn/list-fans-1.shtml',
+           'http://bbs.tianya.cn/list-play-1.shtml']
+
+    pre_url = "http://bbs.tianya.cn"
+    for item_url in url:
+        bankuai = re.search("-.*-", item_url).group()
+        begin_url="http://bbs.tianya.cn/list.jsp?item={}&nextid=1552996800000".format(bankuai)
+        res = requests.get(begin_url, headers, cookies=cookies)
+        soup = BeautifulSoup(res.text, "html.parser")
+        next_url_post=soup.find("div", class_='short-pages-2 clearfix').select("a")[2].attrs['href']
+        next_id=1552996800000
+
+        begin_url = "http://bbs.tianya.cn/list.jsp?item={}&nextid={}".format(bankuai)
+        next_url=
+        while int(next_id)<1584619200000:
+            next_id=re.search("nextid=.*", next_url_post).group()[7:]
+            res = requests.get(begin_url, headers, cookies=cookies)
+            soup = BeautifulSoup(res.text, "html.parser")
 
 
-def get_inter_urls(ui):
+            res = requests.get(begin_url, headers, cookies=cookies)
+            soup = BeautifulSoup(res.text, "html.parser")
+
+
+            res = requests.get(item_url, headers, cookies=cookies)
+            soup = BeautifulSoup(res.text, "html.parser")
+            print(pre_url+soup.find("div", class_='short-pages-2 clearfix').select("a")[2].attrs['href'])
+
+    print(str1[1:-1])
+
+    # url = "http://bbs.tianya.cn/"
+
+    # nav_child_box = soup.find_all("div", class_="nav_child_box")[0].ul.select("li")
+    # lis = []
+    # for item in nav_child_box:
+    #     lis.append(str(pre_url+item.a.get("href")))
+    # print(lis)
+    # print(nav_child_box)
+
+    # print(soup)
+    # urllst = []
+    # for i in range(page):
+    #     ui = f'https://search.bilibili.com/all?keyword={keyword}&page={i + 1}'
+    #     urllst.append(ui)
+    # return urllst
+
+
+def get_inter_urls(url):
     '''
-    【视频页面av号采集】
-    ui：视频信息网页url
-    结果：得到一个视频页面的list
+    【单个论坛版块页面每个帖文url采集】
+    url：视频信息网页url
+    结果：得到一个帖文页面url的list
     '''
-    ri = requests.get(ui, headers)
-    soupi = BeautifulSoup(ri.text, 'html.parser')
-    lis = soupi.find('ul', {'class': 'video-list clearfix'}).find_all('li')
+    pre_url = "http://bbs.tianya.cn"
+    ri = requests.get(url, headers, cookies=cookies)
+    soup = BeautifulSoup(ri.text, 'html.parser')
+    bbs_urllist = soup.find_all('td', {'class': 'td-title faceblue'})
     lst = []
-    for li in lis:
-        lst.append(re.search('av\d+', li.a['href']).group(0))
+    for item in bbs_urllist:
+        lst.append(str(pre_url + item.a['href']))
     return lst
+
+    # for li in lis:
+    #     lst.append(re.search('av\d+', li.a['href']).group(0))
+    # return lst
 
 
 def get_bbsInfo(url):
@@ -120,16 +171,16 @@ def get_bbsInfo(url):
     time = span_all[1].text.split("：")[1].strip()
     click = int(span_all[2].text.split("：")[1].strip())
     reply = int(span_all[3].text.split("：")[1].strip())
-    content = soup.find("div", class_="bbs-content clearfix").text.strip()
+    content = soup.find("div", class_="bbs-content clearfix").text.strip().replace("\n", "-")
 
     data['userid'] = userid
-    data['title']=title
-    data['username']=username
+    data['title'] = title
+    data['username'] = username
 
-    data['time']=time
-    data['click']=click
-    data['reply']=reply
-    data['content']=content
+    data['time'] = time
+    data['click'] = click
+    data['reply'] = reply
+    data['content'] = content
 
     return data
 
@@ -162,10 +213,10 @@ def insert_mysql(data):
     :param data:
     :return:.
     '''
-    keys=",".join(data.keys())
-    values=",".join(str("%s") for i in range(len(data.values())))
+    keys = ",".join(data.keys())
+    values = ",".join(str("%s") for i in range(len(data.values())))
     len(data.values())
-    sql = "insert into tianya({}) values({})".format(keys,values)
+    sql = "insert into tianya({}) values({})".format(keys, values)
     # sql = "insert into video(id,title,desp) values(%s,%s,%s);"
     # val = ('测试1', '测试内容1')
     values_list = data.values()
@@ -207,7 +258,7 @@ def toCSV(data, flags):
         df = pd.DataFrame(columns=(write_clo))
         df.to_csv("bilibili.csv", line_terminator="\n", index=False, mode='a', encoding='utf8')
     except Exception as e:
-        notice_wechat("csv导入异常", "时间: " + current_time() + ", av号： " + data['视频id'], ", 异常信息： " + str(e))
+        notice_wechat("csv导入异常", "时间: " + current_time() + ", url： " + data['视频id'], ", 异常信息： " + str(e))
         print(e)
 
     # python2可以用file替代open
@@ -268,12 +319,17 @@ def sendMail(title, att_name):
 
 
 if __name__ == '__main__':
+    get_outer_urls()
+    url = "/list.jsp?item=828&nextid=1552871535000"
+    # print(int(re.search("nextid=.*", url).group()[7:]))
     # print()
-    url = "http://bbs.tianya.cn/post-funinfo-7923383-1.shtml"
-    data=get_bbsInfo(url)
-    insert_mysql(data)
+    # url = "http://bbs.tianya.cn/post-funinfo-7923383-1.shtml"
+    # inner_url = "http://bbs.tianya.cn/list-university-1.shtml"
+    # lst = get_inter_urls(inner_url)
+    # print(lst)
 
-
+    # data=get_bbsInfo(url)
+    # insert_mysql(data)
     # len=",".join(str("%s") for i in range(7))
     # str1=",".join(keys)
     # print(len)
