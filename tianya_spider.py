@@ -13,7 +13,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.header import Header
-
+from threading import Thread  # 导入线程函数
 
 headers_nocookie = {
     'Connection': 'keep-alive',
@@ -82,24 +82,15 @@ def get_outer_urls():
            'http://bbs.tianya.cn/list-play-1.shtml']
 
     pre_url = "http://bbs.tianya.cn"
+    lis=[]
     for item_url in url:
         bankuai = re.search("-.*-", item_url).group()[1:-1]
         next_id =  1584619200000 #2020-03-19 20:00:00
         count=0  #计数器
-        while int(next_id) >1552996800000 :    #2019-03-19 20:00:00
-            count+=1
-            begin_url = "http://bbs.tianya.cn/list.jsp?item={}&nextid={}".format(bankuai, next_id)
-            res = requests.get(begin_url, headers, cookies=cookies)
-            soup = BeautifulSoup(res.text, "html.parser")
-            bbsurl_list=get_inter_urls(soup)
-            for bbs_url in bbsurl_list:
-                time.sleep(random()+1)
-                bbs_info=get_bbsInfo(bbs_url)
-                insert_mysql(bbs_info)
-                toCSV(bbs_info,1)
-            #获取下一页面的时间戳
-            next_url_post = soup.find("div", class_='short-pages-2 clearfix').select("a")[2].attrs['href']
-            next_id = int(re.search("nextid=.*", next_url_post).group()[7:])
+        lis.append(Thread(target=multi_thread,args=[bankuai,count,next_id]))
+    for item_thread in lis:
+        item_thread.start()
+        time.sleep(1)
 
     # url = "http://bbs.tianya.cn/"
 
@@ -116,6 +107,31 @@ def get_outer_urls():
     #     ui = f'https://search.bilibili.com/all?keyword={keyword}&page={i + 1}'
     #     urllst.append(ui)
     # return urllst
+
+
+def multi_thread(bankuai, count, next_id):
+    '''
+
+    :param bankuai: 版块
+    :param count: 计数器
+    :param next_id: 下一个id
+    :return:
+    '''
+    while int(next_id) > 1552996800000:  # 2019-03-19 20:00:00
+        count += 1
+        print("版块：{}，计数：{}".format(bankuai,count))
+        begin_url = "http://bbs.tianya.cn/list.jsp?item={}&nextid={}".format(bankuai, next_id)
+        res = requests.get(begin_url, headers, cookies=cookies)
+        soup = BeautifulSoup(res.text, "html.parser")
+        bbsurl_list = get_inter_urls(soup)
+        for bbs_url in bbsurl_list:
+            time.sleep(random.random() + 1)
+            bbs_info = get_bbsInfo(bbs_url)
+            insert_mysql(bbs_info)
+            toCSV(bbs_info, 1)
+        # 获取下一页面的时间戳
+        next_url_post = soup.find("div", class_='short-pages-2 clearfix').select("a")[2].attrs['href']
+        next_id = int(re.search("nextid=.*", next_url_post).group()[7:])
 
 
 def get_inter_urls(soup):
@@ -225,17 +241,21 @@ def insert_mysql(data):
     # values[2]="eqeqweqw"
 
     # print(len("【战双帕弥什】帕弥什病毒vs新型冠状病毒"))
-    cursor = con.cursor()
+
     try:
+        cursor = con.cursor()
+        con.ping(reconnect=True)
         cursor.execute(sql, values)
         con.commit()
         print("插入成功")
     except Exception as e:
+        notice_wechat("插入数据库失败", "时间: " + current_time() + ", url： " + data['url'] + ", 异常信息： " + str(e))
         con.rollback()
+
         # print(type(e))
         # ss=str(e)
         # print(ss)
-        notice_wechat("插入数据库失败", "时间: " + current_time() + ", url： " + data['url'] + ", 异常信息： " + str(e))
+
         print("插入失败")
         print(e)
 
@@ -315,11 +335,25 @@ def sendMail(title, att_name):
         print
         "Error: 无法发送邮件"
 
+def test1(arg1,arg2):
+    print("Test1:{},:::{}".format(arg1,arg2))
+def test2(arg):
+    print("Test2:{}".format(arg))
+
 
 if __name__ == '__main__':
     get_outer_urls()
 
-    url = "/list.jsp?item=828&nextid=1552871535000"
+    # notice_wechat("fdf","hfhfhf")
+    # url = "/list.jsp?item=828&nextid=1552871535000"
+
+
+    # lis=[]
+    # for i in range(10):
+    #     lis.append(Thread(target=test1,args=(i,i+1)))
+    # for item in lis:
+    #     item.start()
+
 
     # print(re.search("-.*-", "http://bbs.tianya.cn/list-play-1.shtml").group()[1:-1])
     # print(int(re.search("nextid=.*", url).group()[7:]))
