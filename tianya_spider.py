@@ -14,9 +14,9 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.header import Header
 from threading import Thread  # 导入线程函数
+from DBUtils.PooledDB import PooledDB
 
 headers_nocookie = {
-    'Connection': 'keep-alive',
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.116 Safari/537.36',
     'Accept-Language': 'zh-CN,zh-TW;q=0.9,zh;q=0.8,en-US;q=0.7,en;q=0.6',
 }
@@ -121,7 +121,8 @@ def multi_thread(bankuai, count, next_id):
         count += 1
         print("版块：{}，计数：{}".format(bankuai,count))
         begin_url = "http://bbs.tianya.cn/list.jsp?item={}&nextid={}".format(bankuai, next_id)
-        res = requests.get(begin_url, headers, cookies=cookies)
+        res = requests.get(begin_url, headers, cookies=cookies,timeout=30)
+        time.sleep(random.random()*3)
         soup = BeautifulSoup(res.text, "html.parser")
         bbsurl_list = get_inter_urls(soup)
         for bbs_url in bbsurl_list:
@@ -174,7 +175,7 @@ def get_bbsInfo(url):
     print("正在爬取的url为：{}".format(url))
 
     pre_info = soup.select("div.atl-info")[0]
-    title = soup.find('span', class_='s_title').text.strip()  # 标题
+    title = soup.find('span', style='font-weight:400;').text.strip()  # 标题
     span_all = pre_info.find_all("span")
 
 
@@ -210,15 +211,17 @@ def get_bbsInfo(url):
 
 # 连接数据库
 try:
-    con = pymysql.connect(
+    conn_thread =PooledDB(
+        pymysql,
+        mincached=13,
         host="localhost",
-        port=3306,
-        user='root',
-        password='qwe123456',
-        database='spider'
+        user="root",
+        passwd="qwe123456",
+        db="spider",
+        port=3306
     )
 except:
-    notice_wechat("数据库连接失败啦", "时间为： " + current_time())
+    notice_wechat("数据库连接池初始化失败", "时间为： " + current_time())
 
 
 def insert_mysql(data):
@@ -243,6 +246,7 @@ def insert_mysql(data):
     # print(len("【战双帕弥什】帕弥什病毒vs新型冠状病毒"))
 
     try:
+        con=conn_thread.connection()
         cursor = con.cursor()
         con.ping(reconnect=True)
         cursor.execute(sql, values)
@@ -258,6 +262,9 @@ def insert_mysql(data):
 
         print("插入失败")
         print(e)
+    finally:
+        cursor.close()
+        con.close()
 
 
 def toCSV(data, flags):
@@ -343,6 +350,15 @@ def test2(arg):
 
 if __name__ == '__main__':
     get_outer_urls()
+    # url="http://bbs.tianya.cn/post-play-406189-1-1.shtml"
+    # res=requests.get(url,headers=headers,timeout=30)
+    # soup = BeautifulSoup(res.text, 'html.parser')
+    # # data=soup.select("div.atl-info")
+    # data={}
+    # if(len(data)==0):
+    #     print("为空")
+
+
 
     # notice_wechat("fdf","hfhfhf")
     # url = "/list.jsp?item=828&nextid=1552871535000"
@@ -370,4 +386,5 @@ if __name__ == '__main__':
     # len=",".join(str("%s") for i in range(7))
     # str1=",".join(keys)
     # print(len)
-    con.close()
+    # con.close()
+    conn_thread.close()
