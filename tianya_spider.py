@@ -2,7 +2,7 @@ import re
 from bs4 import BeautifulSoup
 import requests
 import random
-import time
+
 import json
 import pymysql
 import pandas as pd
@@ -16,6 +16,7 @@ from email.mime.multipart import MIMEMultipart
 from email.header import Header
 from threading import Thread  # 导入线程函数
 from DBUtils.PooledDB import PooledDB
+import time
 
 headers_nocookie = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.116 Safari/537.36',
@@ -23,25 +24,28 @@ headers_nocookie = {
 }
 
 cookies = {
-    "ASL": "18340,0000j,78efb1eb",
-    "__cid": "CN",
-    "ADVC": "384bb26d8e7448",
-    "ADVS": "384bb26d8e7448",
-    "__auc": "f0789a4a170f07f547885a63dcb",
-    "bc_ids_w": "vq",
-    "__guid2": "150195568",
-    "__guid": "150195568",
-    "bc_exp": "0.2",
-    "leftNavId": "0",
-    "Hm_lvt_bc5755e0609123f78d0e816bf7dee255": "1584582841,1584587167,1584587171",
-    "JSESSIONID": "abcMn9rrQgSSyc5LqlXdx",
-    "__asc": "f77f2e80170f1c6ecc37d532e5c",
-    "__u_a": "v2.3.0",
-    "tianya1": "12980,1584605702,6,63539",
-    "time": "ct=1584605731.618",
-    "__ptime": "1584605732003",
-    "Hm_lpvt_bc5755e0609123f78d0e816bf7dee255": "1584605732"
+    "__cid":"CN",
+    "ADVC":"384bb26d8e7448",
+    "__auc":"f0789a4a170f07f547885a63dcb",
+    "__guid":"150195568",
+    "__guid2":"150195568",
+    "ASL":"18341,000ja,78efb1eb78efb1eb",
+    "bc_ids_m":"ux",
+    "bc_ids_w":"vs",
+    "bc_exp":"0.2",
+    "ADVS":"384caf1cdacf96",
+    "tianya1":"12980,1584692349,6,64031",
+    "Hm_lvt_bc5755e0609123f78d0e816bf7dee255":"1584587171,1584691369,1584691398,1584692349",
+    "Hm_lvt_80579b57bf1b16bdf88364b13221a8bd":"1584697831",
+    "Hm_lpvt_80579b57bf1b16bdf88364b13221a8bd":"1584697839",
+    "__asc":"99c56f04170f87dc477825f3d76",
+    "__u_a":"v2.3.0",
+    "leftNavId":"0",
+    "time":"ct=1584719260.455",
+    "__ptime":"1584719260705",
+    "Hm_lpvt_bc5755e0609123f78d0e816bf7dee255":"1584719261"
 }
+
 
 headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.116 Safari/537.36',
@@ -56,6 +60,9 @@ def current_time():
     '''
     return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
 
+def sleep(sec):
+    time.sleep(sec)
+
 
 def notice_wechat(title, content):
     '''server酱通知微信'''
@@ -65,6 +72,69 @@ def notice_wechat(title, content):
         'desp': content
     }
     req = requests.post(api, data)
+
+def get_bbsInfo(url,index):
+    while(mutex==1):
+        sleep(0.1)
+    res = requests.get(url,headers=headers,proxies={'http':'http://{}'.format(ips[index])},timeout=50,verify=False)
+    soup = BeautifulSoup(res.text, 'html.parser')
+    print("正在爬取的url为：{}".format(url))
+    data = {}
+
+    #判断是否为空
+    try:
+        pre_info = soup.select("div.atl-info")[0]
+    except:
+        return data
+
+    title = soup.find('span', style='font-weight:400;').text.strip()  # 标题
+    span_all = pre_info.find_all("span")
+
+
+
+    username = span_all[0].a.text  # 用户名
+    userid = span_all[0].a.attrs['uid']  # 用户id
+    time = span_all[1].text.split("：")[1].strip()
+    click = int(span_all[2].text.split("：")[1].strip())
+    reply = int(span_all[3].text.split("：")[1].strip())
+    try:
+        content = soup.find("div", class_="bbs-content clearfix").text.strip().replace("\n", "-")
+    except:
+        content="has something problem"
+
+    data['userid'] = userid
+    data['url']=url
+    data['title'] = title
+    data['username'] = username
+
+    data['time'] = time
+    data['click'] = click
+    data['reply'] = reply
+    data['content'] = content
+
+    return data
+
+    # print(content)
+    # print(pre_info)
+    # print(reply)
+    # print(count)
+    # print(time)
+    # # print(userid)
+    # print(username)
+    # # print(title)
+    # ri = requests.get(ui, headers)
+    # soupi = BeautifulSoup(ri.text, 'html.parser')
+    # # title = soupi.find(id = "viewbox_report").span.text
+    # title = soupi.h1['title']  # 标题
+    # upload_time = soupi.find("span", {'class': 'a-crumbs'}).next_sibling.text  # 上传时间
+    # # upload_time = re.search(r'(20.*\d)',soupi.find("div",class_ ="video-data").text)
+    # play_count = soupi.find("div", {'class': 'video-data'})  # 播放量
+
+    # 弹幕
+    # cid = re.search(r'"cid":(\d*),', ri.text).group(1)  # cid
+
+
+
 
 
 def get_outer_urls():
@@ -87,7 +157,7 @@ def get_outer_urls():
         bankuai = re.search("-.*-", url[i]).group()[1:-1]
         next_id =  1584619200000 #2020-03-19 20:00:00
         count=0  #计数器
-        thread_lis.append(Thread(target=multi_thread,args=[bankuai,count,next_id,ips[i]]))
+        thread_lis.append(Thread(target=multi_thread,args=[bankuai,count,next_id,i]))
     for item_thread in thread_lis:
         item_thread.start()
         time.sleep(1)
@@ -109,24 +179,24 @@ def get_outer_urls():
     # return urllst
 
 
-def multi_thread(bankuai, count, next_id,proxy):
+def multi_thread(bankuai, count, next_id,index):
     '''
     :param bankuai: 版块
     :param count: 计数器
     :param next_id: 下一个id
-    :param proxy: 代理ip
+    :param proxy: 代理ip的下标索引
     '''
     while int(next_id) > 1552996800000:  # 2019-03-19 20:00:00
         count += 1
         print("版块：{}，计数：{}".format(bankuai,count))
         begin_url = "http://bbs.tianya.cn/list.jsp?item={}&nextid={}".format(bankuai, next_id)
-        res = requests.get(begin_url, headers=headers,proxies={'http':'http://{}'.format(proxy)},timeout=30,verify=False)
-        time.sleep(random.random()*3)
+        res = requests.get(begin_url, headers=headers,cookies=cookies,timeout=30,verify=False)
+        # time.sleep(random.random())
         soup = BeautifulSoup(res.text, "html.parser")
         bbsurl_list = get_inter_urls(soup)
         for bbs_url in bbsurl_list:
             time.sleep(random.random() + 1)
-            bbs_info = get_bbsInfo(bbs_url)
+            bbs_info = get_bbsInfo(bbs_url,index)
             if(len(bbs_info)!=0):
                 insert_mysql(bbs_info)
                 toCSV(bbs_info, 1)
@@ -155,65 +225,7 @@ def get_inter_urls(soup):
     # return lst
 
 
-def get_bbsInfo(url,proxy):
-    '''
-    url：论坛页面网址
-    proxy:代理
-    '''
-    # ri = requests.get(ui, headers)
-    # soupi = BeautifulSoup(ri.text, 'html.parser')
-    # # title = soupi.find(id = "viewbox_report").span.text
-    # title = soupi.h1['title']  # 标题
-    # upload_time = soupi.find("span", {'class': 'a-crumbs'}).next_sibling.text  # 上传时间
-    # # upload_time = re.search(r'(20.*\d)',soupi.find("div",class_ ="video-data").text)
-    # play_count = soupi.find("div", {'class': 'video-data'})  # 播放量
 
-    # 弹幕
-    # cid = re.search(r'"cid":(\d*),', ri.text).group(1)  # cid
-
-    res = requests.get(url,headers=headers,proxies={'http':'http://{}'.format(proxy)},timeout=30,verify=False)
-    soup = BeautifulSoup(res.text, 'html.parser')
-    print("正在爬取的url为：{}".format(url))
-    data = {}
-
-    #判断是否为空
-    try:
-        pre_info = soup.select("div.atl-info")[0]
-    except:
-        return data
-
-    title = soup.find('span', style='font-weight:400;').text.strip()  # 标题
-    span_all = pre_info.find_all("span")
-
-
-
-    username = span_all[0].a.text  # 用户名
-    userid = span_all[0].a.attrs['uid']  # 用户id
-    time = span_all[1].text.split("：")[1].strip()
-    click = int(span_all[2].text.split("：")[1].strip())
-    reply = int(span_all[3].text.split("：")[1].strip())
-    content = soup.find("div", class_="bbs-content clearfix").text.strip().replace("\n", "-")
-
-    data['userid'] = userid
-    data['url']=url
-    data['title'] = title
-    data['username'] = username
-
-    data['time'] = time
-    data['click'] = click
-    data['reply'] = reply
-    data['content'] = content
-
-    return data
-
-    # print(content)
-    # print(pre_info)
-    # print(reply)
-    # print(count)
-    # print(time)
-    # # print(userid)
-    # print(username)
-    # # print(title)
 
 
 # 连接数据库
@@ -353,7 +365,7 @@ def test2(arg):
 
 def ip_proxy():
     url="http://bbs.tianya.cn/post-university-1186376-1.shtml"
-    res=requests.get(url,proxies={'http':'http://101.37.118.54:8888'},timeout=30,verify=False)
+    res=requests.get(url,proxies={'http':'http://101.37.118.54:8888'},timeout=50,verify=False)
     soup=BeautifulSoup(res.text,"html.parser")
     title=soup.find("span",class_="s_title").text
     print(title)
@@ -367,8 +379,12 @@ class GetIpThread(threading.Thread):
         self.fetchSecond = fetchSecond;
 
     def run(self):
+        lis=[]
+        for i in range(7):
+            lis.append(i+1)
         global mutex
-        apiUrl="https://ip.jiangxianli.com/api/proxy_ips?country=中国"
+        page=random.randint(1,7)
+        apiUrl="https://ip.jiangxianli.com/api/proxy_ips?country=中国&page={}".format(page)
         while True:
             # 获取IP列表
             res = requests.get(apiUrl,timeout=30)
@@ -381,7 +397,7 @@ class GetIpThread(threading.Thread):
                 ips.append("{}:{}".format(item['ip'],item['port']))
 
             mutex=0
-            print("长度：{}，{}".format(len(ips),ips))
+            print("长度：{}，索引：{}-{}".format(len(ips),page,ips))
             # ips = res.split('\n');
             # # 利用每一个IP
             # for proxyip in ips:
@@ -397,19 +413,26 @@ class GetIpThread(threading.Thread):
 
 
 if __name__ == '__main__':
+
+
+    GetIpThread(4).start()
     # get_outer_urls()
 
-    GetIpThread(5).start()
+
+
     # for i in range(6):
     #     print(i)
 
 
     # ip_proxy()
 
-    # url="http://bbs.tianya.cn/post-play-406189-1-1.shtml"
+    # url="http://bbs.tianya.cn/post-me-291154-1.shtml"
     # res=requests.get(url,headers=headers,timeout=30)
     # soup = BeautifulSoup(res.text, 'html.parser')
-    # # data=soup.select("div.atl-info")
+    # content=soup.find("div", class_="atl-con-bd clearfix").text.strip().replace("\n", "-")
+    # print(content)
+
+    # data=soup.select("div.atl-info")
     # data={}
     # if(len(data)==0):
     #     print("为空")
