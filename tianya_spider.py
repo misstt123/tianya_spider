@@ -466,4 +466,7 @@ if __name__ == '__main__':
     # str1=",".join(keys)
     # print(len)
     # con.close()
+
     conn_thread.close()
+    sendMail("抓取完成，请查看附件","tianya.csv")
+    notice_wechat("抓取完成了","请查看数据库")
