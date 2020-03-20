@@ -14,6 +14,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.header import Header
 
+
 headers_nocookie = {
     'Connection': 'keep-alive',
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.116 Safari/537.36',
@@ -58,7 +59,7 @@ def current_time():
 
 def notice_wechat(title, content):
     '''server酱通知微信'''
-    api = "https://sc.ftqq.com/SCU34444T94b6628ac7cdafb625a54ed4d75976545e6f70180d158.send"
+    api = "https://sc.ftqq.com/SCU34444Tec5ddc0a08f5efe3747f9e2673adf2975e74272531a5f.send"
     data = {
         'text': title,
         'desp': content
@@ -82,30 +83,23 @@ def get_outer_urls():
 
     pre_url = "http://bbs.tianya.cn"
     for item_url in url:
-        bankuai = re.search("-.*-", item_url).group()
-        begin_url="http://bbs.tianya.cn/list.jsp?item={}&nextid=1552996800000".format(bankuai)
-        res = requests.get(begin_url, headers, cookies=cookies)
-        soup = BeautifulSoup(res.text, "html.parser")
-        next_url_post=soup.find("div", class_='short-pages-2 clearfix').select("a")[2].attrs['href']
-        next_id=1552996800000
-
-        begin_url = "http://bbs.tianya.cn/list.jsp?item={}&nextid={}".format(bankuai)
-        next_url=
-        while int(next_id)<1584619200000:
-            next_id=re.search("nextid=.*", next_url_post).group()[7:]
+        bankuai = re.search("-.*-", item_url).group()[1:-1]
+        next_id =  1584619200000 #2020-03-19 20:00:00
+        count=0  #计数器
+        while int(next_id) >1552996800000 :    #2019-03-19 20:00:00
+            count+=1
+            begin_url = "http://bbs.tianya.cn/list.jsp?item={}&nextid={}".format(bankuai, next_id)
             res = requests.get(begin_url, headers, cookies=cookies)
             soup = BeautifulSoup(res.text, "html.parser")
-
-
-            res = requests.get(begin_url, headers, cookies=cookies)
-            soup = BeautifulSoup(res.text, "html.parser")
-
-
-            res = requests.get(item_url, headers, cookies=cookies)
-            soup = BeautifulSoup(res.text, "html.parser")
-            print(pre_url+soup.find("div", class_='short-pages-2 clearfix').select("a")[2].attrs['href'])
-
-    print(str1[1:-1])
+            bbsurl_list=get_inter_urls(soup)
+            for bbs_url in bbsurl_list:
+                time.sleep(random()+1)
+                bbs_info=get_bbsInfo(bbs_url)
+                insert_mysql(bbs_info)
+                toCSV(bbs_info,1)
+            #获取下一页面的时间戳
+            next_url_post = soup.find("div", class_='short-pages-2 clearfix').select("a")[2].attrs['href']
+            next_id = int(re.search("nextid=.*", next_url_post).group()[7:])
 
     # url = "http://bbs.tianya.cn/"
 
@@ -124,15 +118,15 @@ def get_outer_urls():
     # return urllst
 
 
-def get_inter_urls(url):
+def get_inter_urls(soup):
     '''
-    【单个论坛版块页面每个帖文url采集】
-    url：视频信息网页url
+    单个论坛版块页面每个帖文url采集
     结果：得到一个帖文页面url的list
+    :param soup: beautifulsoup
     '''
     pre_url = "http://bbs.tianya.cn"
-    ri = requests.get(url, headers, cookies=cookies)
-    soup = BeautifulSoup(ri.text, 'html.parser')
+    # ri = requests.get(url, headers, cookies=cookies)
+    # soup = BeautifulSoup(ri.text, 'html.parser')
     bbs_urllist = soup.find_all('td', {'class': 'td-title faceblue'})
     lst = []
     for item in bbs_urllist:
@@ -161,11 +155,14 @@ def get_bbsInfo(url):
 
     res = requests.get(url, headers=headers, cookies=cookies)
     soup = BeautifulSoup(res.text, 'html.parser')
-    data = {}
+    print("正在爬取的url为：{}".format(url))
+
     pre_info = soup.select("div.atl-info")[0]
     title = soup.find('span', class_='s_title').text.strip()  # 标题
     span_all = pre_info.find_all("span")
 
+
+    data = {}
     username = span_all[0].a.text  # 用户名
     userid = span_all[0].a.attrs['uid']  # 用户id
     time = span_all[1].text.split("：")[1].strip()
@@ -174,6 +171,7 @@ def get_bbsInfo(url):
     content = soup.find("div", class_="bbs-content clearfix").text.strip().replace("\n", "-")
 
     data['userid'] = userid
+    data['url']=url
     data['title'] = title
     data['username'] = username
 
@@ -237,7 +235,7 @@ def insert_mysql(data):
         # print(type(e))
         # ss=str(e)
         # print(ss)
-        notice_wechat("插入数据库失败", "时间: " + current_time() + ", av号： " + data['视频id'] + ", 异常信息： " + str(e))
+        notice_wechat("插入数据库失败", "时间: " + current_time() + ", url： " + data['url'] + ", 异常信息： " + str(e))
         print("插入失败")
         print(e)
 
@@ -256,9 +254,9 @@ def toCSV(data, flags):
         write_clo = data
     try:
         df = pd.DataFrame(columns=(write_clo))
-        df.to_csv("bilibili.csv", line_terminator="\n", index=False, mode='a', encoding='utf8')
+        df.to_csv("tianya.csv", line_terminator="\n", index=False, mode='a', encoding='utf8')
     except Exception as e:
-        notice_wechat("csv导入异常", "时间: " + current_time() + ", url： " + data['视频id'], ", 异常信息： " + str(e))
+        notice_wechat("csv插入异常", "时间: " + current_time() + ", url： " + data['url'], ", 异常信息： " + str(e))
         print(e)
 
     # python2可以用file替代open
@@ -320,7 +318,10 @@ def sendMail(title, att_name):
 
 if __name__ == '__main__':
     get_outer_urls()
+
     url = "/list.jsp?item=828&nextid=1552871535000"
+
+    # print(re.search("-.*-", "http://bbs.tianya.cn/list-play-1.shtml").group()[1:-1])
     # print(int(re.search("nextid=.*", url).group()[7:]))
     # print()
     # url = "http://bbs.tianya.cn/post-funinfo-7923383-1.shtml"
@@ -328,7 +329,9 @@ if __name__ == '__main__':
     # lst = get_inter_urls(inner_url)
     # print(lst)
 
+    # url="http://bbs.tianya.cn/post-828-1562804-1.shtml"
     # data=get_bbsInfo(url)
+    # toCSV(data,1)
     # insert_mysql(data)
     # len=",".join(str("%s") for i in range(7))
     # str1=",".join(keys)
