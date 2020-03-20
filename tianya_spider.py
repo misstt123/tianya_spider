@@ -128,8 +128,9 @@ def multi_thread(bankuai, count, next_id):
         for bbs_url in bbsurl_list:
             time.sleep(random.random() + 1)
             bbs_info = get_bbsInfo(bbs_url)
-            insert_mysql(bbs_info)
-            toCSV(bbs_info, 1)
+            if(len(bbs_info)!=0):
+                insert_mysql(bbs_info)
+                toCSV(bbs_info, 1)
         # 获取下一页面的时间戳
         next_url_post = soup.find("div", class_='short-pages-2 clearfix').select("a")[2].attrs['href']
         next_id = int(re.search("nextid=.*", next_url_post).group()[7:])
@@ -173,13 +174,19 @@ def get_bbsInfo(url):
     res = requests.get(url, headers=headers, cookies=cookies)
     soup = BeautifulSoup(res.text, 'html.parser')
     print("正在爬取的url为：{}".format(url))
+    data = {}
 
-    pre_info = soup.select("div.atl-info")[0]
+    #判断是否为空
+    try:
+        pre_info = soup.select("div.atl-info")[0]
+    except:
+        return data
+
     title = soup.find('span', style='font-weight:400;').text.strip()  # 标题
     span_all = pre_info.find_all("span")
 
 
-    data = {}
+
     username = span_all[0].a.text  # 用户名
     userid = span_all[0].a.attrs['uid']  # 用户id
     time = span_all[1].text.split("：")[1].strip()
@@ -346,6 +353,9 @@ def test1(arg1,arg2):
     print("Test1:{},:::{}".format(arg1,arg2))
 def test2(arg):
     print("Test2:{}".format(arg))
+
+def ip_proxy():
+
 
 
 if __name__ == '__main__':
