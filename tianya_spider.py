@@ -9,6 +9,7 @@ import pandas as pd
 import html
 import csv
 import pymongo
+import threading;
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -43,7 +44,6 @@ cookies = {
 }
 
 headers = {
-    'Connection': 'keep-alive',
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.116 Safari/537.36',
     'Accept-Language': 'zh-CN,zh-TW;q=0.9,zh;q=0.8,en-US;q=0.7,en;q=0.6',
 }
@@ -81,14 +81,14 @@ def get_outer_urls():
            'http://bbs.tianya.cn/list-no11-1.shtml', 'http://bbs.tianya.cn/list-fans-1.shtml',
            'http://bbs.tianya.cn/list-play-1.shtml']
 
-    pre_url = "http://bbs.tianya.cn"
-    lis=[]
-    for item_url in url:
-        bankuai = re.search("-.*-", item_url).group()[1:-1]
+    # pre_url = "http://bbs.tianya.cn"
+    thread_lis=[]
+    for i in range(len(url)):
+        bankuai = re.search("-.*-", url[i]).group()[1:-1]
         next_id =  1584619200000 #2020-03-19 20:00:00
         count=0  #计数器
-        lis.append(Thread(target=multi_thread,args=[bankuai,count,next_id]))
-    for item_thread in lis:
+        thread_lis.append(Thread(target=multi_thread,args=[bankuai,count,next_id,ips[i]]))
+    for item_thread in thread_lis:
         item_thread.start()
         time.sleep(1)
 
@@ -109,19 +109,18 @@ def get_outer_urls():
     # return urllst
 
 
-def multi_thread(bankuai, count, next_id):
+def multi_thread(bankuai, count, next_id,proxy):
     '''
-
     :param bankuai: 版块
     :param count: 计数器
     :param next_id: 下一个id
-    :return:
+    :param proxy: 代理ip
     '''
     while int(next_id) > 1552996800000:  # 2019-03-19 20:00:00
         count += 1
         print("版块：{}，计数：{}".format(bankuai,count))
         begin_url = "http://bbs.tianya.cn/list.jsp?item={}&nextid={}".format(bankuai, next_id)
-        res = requests.get(begin_url, headers, cookies=cookies,timeout=30)
+        res = requests.get(begin_url, headers=headers,proxies={'http':'http://{}'.format(proxy)},timeout=30,verify=False)
         time.sleep(random.random()*3)
         soup = BeautifulSoup(res.text, "html.parser")
         bbsurl_list = get_inter_urls(soup)
@@ -156,9 +155,10 @@ def get_inter_urls(soup):
     # return lst
 
 
-def get_bbsInfo(url):
+def get_bbsInfo(url,proxy):
     '''
     url：论坛页面网址
+    proxy:代理
     '''
     # ri = requests.get(ui, headers)
     # soupi = BeautifulSoup(ri.text, 'html.parser')
@@ -171,7 +171,7 @@ def get_bbsInfo(url):
     # 弹幕
     # cid = re.search(r'"cid":(\d*),', ri.text).group(1)  # cid
 
-    res = requests.get(url, headers=headers, cookies=cookies)
+    res = requests.get(url,headers=headers,proxies={'http':'http://{}'.format(proxy)},timeout=30,verify=False)
     soup = BeautifulSoup(res.text, 'html.parser')
     print("正在爬取的url为：{}".format(url))
     data = {}
@@ -247,10 +247,7 @@ def insert_mysql(data):
     values = tuple(values_list)
     # values = values[0:3]
     print(values)
-    # values=("av85314885","我是题目","我想这大概是过得最无聊的春节了吧，突如来的病毒让我们只能留在家中--原本我计划的休息也变成了肝视频--恨死了这该死的病毒了--希望大家保护好自己--出门记得戴口罩，尽量不去避免人员密集地方--拒绝野味~！！--武汉加油，中国加油------借物表：--模型：战双帕弥什-露西亚/Pocket-Vocaloid/Lct红枣/椛暗/军士--动作：绅士黑衣--镜头：绅士黑衣--场景：胧月兔--MME：Burner/thunter/Rui_斯基/Ikeno--原片地址：搬运：av3290381--https://www.youtube.com/watch?v=Z8piSgx_CUM搬运自https://www.youtube.com/watch?v=Z8piSgx_CUM")
-    # values[2]="eqeqweqw"
 
-    # print(len("【战双帕弥什】帕弥什病毒vs新型冠状病毒"))
 
     try:
         con=conn_thread.connection()
@@ -355,11 +352,60 @@ def test2(arg):
     print("Test2:{}".format(arg))
 
 def ip_proxy():
+    url="http://bbs.tianya.cn/post-university-1186376-1.shtml"
+    res=requests.get(url,proxies={'http':'http://101.37.118.54:8888'},timeout=30,verify=False)
+    soup=BeautifulSoup(res.text,"html.parser")
+    title=soup.find("span",class_="s_title").text
+    print(title)
 
+ips=[] #ip列表
+mutex=0 #标志位
+
+class GetIpThread(threading.Thread):
+    def __init__(self, fetchSecond):
+        super(GetIpThread, self).__init__();
+        self.fetchSecond = fetchSecond;
+
+    def run(self):
+        global mutex
+        apiUrl="https://ip.jiangxianli.com/api/proxy_ips?country=中国"
+        while True:
+            # 获取IP列表
+            res = requests.get(apiUrl,timeout=30)
+            content=json.loads(res.text,encoding='utf-8')['data']['data']
+            # 按照\n分割获取到的IP
+            mutex=1
+            ips.clear()
+
+            for item in content:
+                ips.append("{}:{}".format(item['ip'],item['port']))
+
+            mutex=0
+            print("长度：{}，{}".format(len(ips),ips))
+            # ips = res.split('\n');
+            # # 利用每一个IP
+            # for proxyip in ips:
+            #
+            #     if proxyip.strip() == '':
+            #         continue
+            #
+            #     print(proxyip)
+            #     # 开启一个线程
+            #     CrawlThread(proxyip).start();
+            # 休眠
+            time.sleep(self.fetchSecond);
 
 
 if __name__ == '__main__':
-    get_outer_urls()
+    # get_outer_urls()
+
+    GetIpThread(5).start()
+    # for i in range(6):
+    #     print(i)
+
+
+    # ip_proxy()
+
     # url="http://bbs.tianya.cn/post-play-406189-1-1.shtml"
     # res=requests.get(url,headers=headers,timeout=30)
     # soup = BeautifulSoup(res.text, 'html.parser')
