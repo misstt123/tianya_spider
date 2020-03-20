@@ -160,7 +160,7 @@ def get_outer_urls():
         thread_lis.append(Thread(target=multi_thread,args=[bankuai,count,next_id,i]))
     for item_thread in thread_lis:
         item_thread.start()
-        time.sleep(1)
+        time.sleep(0.2)
 
     # url = "http://bbs.tianya.cn/"
 
@@ -187,6 +187,7 @@ def multi_thread(bankuai, count, next_id,index):
     :param proxy: 代理ip的下标索引
     '''
     while int(next_id) > 1552996800000:  # 2019-03-19 20:00:00
+        sleep(0.1)
         count += 1
         print("版块：{}，计数：{}".format(bankuai,count))
         begin_url = "http://bbs.tianya.cn/list.jsp?item={}&nextid={}".format(bankuai, next_id)
@@ -380,12 +381,11 @@ class GetIpThread(threading.Thread):
 
     def run(self):
         lis=[]
-        for i in range(7):
+        for i in range(3):
             lis.append(i+1)
         global mutex
-        page=random.randint(1,7)
-        apiUrl="https://ip.jiangxianli.com/api/proxy_ips?country=中国&page={}".format(page)
         while True:
+            apiUrl="https://ip.jiangxianli.com/api/proxy_ips?country=中国&page={}".format(random.randint(1,7))
             # 获取IP列表
             res = requests.get(apiUrl,timeout=30)
             content=json.loads(res.text,encoding='utf-8')['data']['data']
@@ -397,7 +397,7 @@ class GetIpThread(threading.Thread):
                 ips.append("{}:{}".format(item['ip'],item['port']))
 
             mutex=0
-            print("长度：{}，索引：{}-{}".format(len(ips),page,ips))
+            # print("长度：{}，{}".format(len(ips),ips))
             # ips = res.split('\n');
             # # 利用每一个IP
             # for proxyip in ips:
@@ -415,8 +415,8 @@ class GetIpThread(threading.Thread):
 if __name__ == '__main__':
 
 
-    GetIpThread(4).start()
-    # get_outer_urls()
+    GetIpThread(20).start()
+    get_outer_urls()
 
 
 
